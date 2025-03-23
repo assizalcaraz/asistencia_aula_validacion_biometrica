@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro de Asistencia</title>
+</head>
+<body>
+    <h1>Registro de Asistencia</h1>
+    <form method="POST" onsubmit="return enviarFormulario(event);">
+        {% csrf_token %}
+        <label for="dni">DNI:</label>
+        <input type="text" id="dni" name="dni" required><br><br>
+
+        <label for="clave">Clave Secreta:</label>
+        <input type="password" id="clave" name="clave" required><br><br>
+
+        <label for="email">Email (solo para registro):</label>
+        <input type="email" id="email" name="email"><br><br>
+
+        <label for="selfie">Selfie:</label><br>
+        <video id="video" width="320" height="240" autoplay playsinline muted></video>
+
+        <button type="button" onclick="capturarFoto()">Capturar</button><br><br>
+        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+        <input type="hidden" name="selfie" id="selfie">
+
+        <button type="submit">Enviar Asistencia</button>
+    </form>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const selfieInput = document.getElementById('selfie');
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            });
+
+        function capturarFoto() {
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataURL = canvas.toDataURL('image/jpeg');
+            selfieInput.value = dataURL;
+            alert('Foto capturada. Ahora podés enviar.');
+        }
+
+        function enviarFormulario(event) {
+            if (!selfieInput.value) {
+                alert('Por favor, capturá tu selfie antes de enviar.');
+                return false;
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>

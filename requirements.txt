@@ -1,0 +1,8 @@
+django>=4.2
+face_recognition
+dlib
+opencv-python
+qrcode
+pillow
+cryptography
+netifaces 

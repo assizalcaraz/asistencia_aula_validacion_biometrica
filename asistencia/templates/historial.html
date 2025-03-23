@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Historial de Asistencias</title>
+</head>
+<body>
+    <h1>Historial de Asistencias</h1>
+    <table border="1" cellpadding="5">
+        <thead>
+            <tr>
+                <th>DNI</th>
+                <th>Fecha y hora</th>
+                <th>Foto</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for registro in registros %}
+            <tr>
+                <td>{{ registro.dni }}</td>
+                <td>{{ registro.timestamp }}</td>
+                <td>
+                    <img src="data:image/png;base64,{{ qr_data }}" alt="Código QR">
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

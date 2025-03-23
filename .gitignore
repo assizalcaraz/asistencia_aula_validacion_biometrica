@@ -1,0 +1,57 @@
+# Entorno virtual
+env/
+venv/
+ENV/
+*.pyc
+__pycache__/
+
+# Archivos y bases de datos locales
+db.sqlite3
+*.sqlite3
+
+# Archivos temporales
+*.log
+*.pot
+*.py[cod]
+*.swp
+*.swo
+*~
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de configuración local
+.env
+*.secret
+
+# Archivos de cobertura y pruebas
+htmlcov/
+.coverage
+.coverage.*
+
+# Carpeta de media/upload si se genera
+media/
+uploads/
+
+# Docker
+*.pid
+docker-compose.override.yml
+__pycache__/
+build/
+*.npy
+
+# Certificados SSL autofirmados
+nginx/certs/dev.*
+
+# Archivos de backup
+*.bak
+*.old
+*.orig
+
+# Archivos de JetBrains/PyCharm
+.idea/
+*.iml
+
+# VSCode
+.vscode/
