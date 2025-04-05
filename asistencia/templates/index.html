@@ -3,54 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <title>Registro de Asistencia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 2rem;
+            max-width: 600px;
+            margin: auto;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 1rem;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="email"] {
+            width: 100%;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            margin-top: 1.5rem;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #debug {
+            margin-top: 1rem;
+            color: red;
+        }
+        #video, #canvas {
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <h1>Registro de Asistencia</h1>
-    <form method="POST" onsubmit="return enviarFormulario(event);">
+    <form method="POST" onsubmit="return capturarYEnviar(event);">
         {% csrf_token %}
         <label for="dni">DNI:</label>
-        <input type="text" id="dni" name="dni" required><br><br>
+        <input type="text" id="dni" name="dni" required>
 
         <label for="clave">Clave Secreta:</label>
-        <input type="password" id="clave" name="clave" required><br><br>
+        <input type="password" id="clave" name="clave" required>
 
         <label for="email">Email (solo para registro):</label>
-        <input type="email" id="email" name="email"><br><br>
+        <input type="email" id="email" name="email">
 
-        <label for="selfie">Selfie:</label><br>
-        <video id="video" width="320" height="240" autoplay playsinline muted></video>
-
-        <button type="button" onclick="capturarFoto()">Capturar</button><br><br>
-        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas"></canvas>
         <input type="hidden" name="selfie" id="selfie">
 
         <button type="submit">Enviar Asistencia</button>
+
+        <div id="debug"></div>
     </form>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const selfieInput = document.getElementById('selfie');
+        const debug = document.getElementById('debug');
+
+        let streamOk = false;
 
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
+                streamOk = true;
+            })
+            .catch(error => {
+                debug.innerText = '❌ No se pudo acceder a la cámara: ' + error.message;
+                streamOk = false;
             });
 
-        function capturarFoto() {
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataURL = canvas.toDataURL('image/jpeg');
-            selfieInput.value = dataURL;
-            alert('Foto capturada. Ahora podés enviar.');
-        }
+        function capturarYEnviar(event) {
+            event.preventDefault();
 
-        function enviarFormulario(event) {
-            if (!selfieInput.value) {
-                alert('Por favor, capturá tu selfie antes de enviar.');
+            if (!streamOk) {
+                alert("La cámara no está disponible.");
                 return false;
             }
-            return true;
+
+            // Captura automática antes de enviar
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+
+            if (dataURL.length > 100) {
+                selfieInput.value = dataURL;
+                debug.innerText = '✅ Selfie capturada. Enviando...';
+                event.target.submit();  // Envío del formulario
+            } else {
+                debug.innerText = '❌ Error: no se pudo capturar la selfie';
+            }
+
+            return false;
         }
     </script>
 </body>

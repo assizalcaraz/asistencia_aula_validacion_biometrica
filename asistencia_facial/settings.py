@@ -81,6 +81,9 @@ def get_local_ip():
         s.close()
     return ip
 
+
+
 CSRF_TRUSTED_ORIGINS = [
-    f"https://{os.environ.get('DJANGO_HOST_IP', 'localhost')}"
+    f"https://{os.environ.get('DJANGO_HOST_IP', 'localhost')}",
+    "https://*.trycloudflare.com",
 ]
