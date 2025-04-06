@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Registro de Estudiante</h1>
+
+{% if messages %}
+  <ul id="feedback">
+    {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+<form method="POST" onsubmit="return enviarFormulario(event);">
+  {% csrf_token %}
+  <label>DNI:</label>
+  <input type="text" name="dni" required>
+
+  <label>Clave secreta:</label>
+  <input type="password" name="clave" required>
+
+  <input type="hidden" name="selfie" id="selfie">
+  <button type="submit">Registrar</button>
+  <div id="debug"></div>
+</form>
+
+<p style="margin-top: 1.5rem;">
+  ¿Ya estás registrado? <a href="{% url 'asistencia' %}">Ir a dar presente</a>
+</p>
+
+<script>
+const selfieInput = document.getElementById('selfie');
+const debug = document.getElementById('debug');
+let video;
+
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    video = document.createElement('video');
+    video.style.display = 'none';
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+    document.body.appendChild(video);
+    video.srcObject = stream;
+  })
+  .catch(error => {
+    debug.innerText = '❌ No se pudo acceder a la cámara: ' + error.message;
+  });
+
+function capturarFoto() {
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  selfieInput.value = canvas.toDataURL('image/jpeg', 0.95);
+}
+
+function enviarFormulario(event) {
+  if (!video || !video.videoWidth) {
+    debug.innerText = '❌ Esperando a que la cámara esté lista...';
+    event.preventDefault();
+    return false;
+  }
+  capturarFoto();
+  if (!selfieInput.value) {
+    debug.innerText = '❌ No se capturó la imagen.';
+    event.preventDefault();
+    return false;
+  }
+  return true;
+}
+</script>
+{% endblock %}

@@ -3,16 +3,35 @@ version: '3.8'
 services:
   web:
     build: .
+    container_name: asistencia_facial-web
     ports:
       - "8000:8000"
     environment:
       DJANGO_HOST_IP: 192.168.1.16
+    volumes:
+    - tunnel_data:/tunnel_data  # <--- en web
     networks:
       - app_net
+
+  cf_tunnel:
+    build:
+      context: .
+      dockerfile: Dockerfile.cf_tunnel
+    container_name: cf_tunnel
+    command: ["/bin/sh", "/app/cloudflared-entry.sh"]
+    volumes:
+      - tunnel_data:/tunnel_data
+    networks:
+      - app_net
+    depends_on:
+      - web
+
+
 
 
   nginx:
     image: nginx:latest
+    container_name: asistencia_facial-nginx
     ports:
       - "443:443"
     volumes:
@@ -22,6 +41,9 @@ services:
       - web
     networks:
       - app_net
+
+volumes:
+  tunnel_data:
 
 networks:
   app_net:

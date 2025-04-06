@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>QR de Asistencia</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .qr-container {
+            background: #1e1e1e;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            text-align: center;
+        }
+        .qr-container img {
+            max-width: 250px;
+            margin-bottom: 1rem;
+        }
+        .url-preview {
+            word-break: break-all;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="qr-container">
+        <h2>Escaneá para dar presente</h2>
+        <img src="data:image/png;base64,{{ qr_base64 }}" alt="Código QR de asistencia">
+        <p class="url-preview">{{ url_completa }}</p>
+    </div>
+</body>
+</html>

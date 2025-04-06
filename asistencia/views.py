@@ -1,24 +1,28 @@
+# Librerías estándar
 import os
-import base64
 import socket
-import qrcode
-import face_recognition
-import numpy as np
+import base64
+import secrets
 from io import BytesIO
-from django.shortcuts import render
-from django.utils import timezone
+
+# Librerías de terceros
+import qrcode
+import numpy as np
+import netifaces
+import face_recognition
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# Django
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseServerError
-from .models import Asistencia, Estudiante
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
-from cryptography.fernet import Fernet
-import hashlib
-import secrets
-import base64
-import netifaces 
+from django.shortcuts import render
+from django.utils import timezone
 
+# Modelos locales
+from .models import Asistencia, Estudiante
 
 def derive_key_from_secret(secret: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -29,7 +33,6 @@ def derive_key_from_secret(secret: str, salt: bytes) -> bytes:
         backend=default_backend()
     )
     return base64.urlsafe_b64encode(kdf.derive(secret.encode()))
-
 
 def index(request):
     if request.method == 'POST':
@@ -57,7 +60,6 @@ def index(request):
             if not match:
                 return HttpResponse("El rostro no coincide con el registrado o la clave es incorrecta", status=403)
         except Estudiante.DoesNotExist:
-            # Nuevo estudiante: generar salt y guardar encoding cifrado
             salt = secrets.token_bytes(16)
             key = derive_key_from_secret(clave, salt)
             fernet = Fernet(key)
@@ -72,18 +74,13 @@ def index(request):
 
     return render(request, 'index.html')
 
-
 def historial(request):
     registros = Asistencia.objects.order_by('-timestamp')
     return render(request, 'historial.html', {'registros': registros})
 
-
- # asegurate de tenerlo en requirements.txt
-
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # No se necesita que esté activa la IP, solo se usa para obtener la IP local correcta
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
     except Exception:
@@ -92,20 +89,100 @@ def get_local_ip():
         s.close()
     return ip
 
+
+
+def registrar_asistencia(request):
+    token = request.GET.get("token", "no-token")
+    return HttpResponse(f"Asistencia recibida con token: {token}")
+
+
 def qr_acceso(request):
     try:
-        ip = os.environ.get("DJANGO_HOST_IP", "localhost")
-        url = f"https://{ip}/"
+        tunnel_file = "/app/tmp/tunnel_url.txt"
+        if not os.path.exists(tunnel_file):
+            return HttpResponseServerError("No se encontró el túnel activo.")
+
+        tunnel_url = None
+        with open(tunnel_file, "r") as f:
+            for line in f:
+                if "trycloudflare.com" in line:
+                    tunnel_url = line.strip()
+                    break
+
+        if not tunnel_url:
+            return HttpResponseServerError("No se pudo obtener la URL del túnel.")
+
+        url_final = f"{tunnel_url}/verificacion"
+
+        qr = qrcode.make(url_final)
+        buffered = BytesIO()
+        qr.save(buffered, format="PNG")
+        img_base64 = base64.b64encode(buffered.getvalue()).decode()
+
+        return render(request, "qr_dashboard.html", {
+            "qr_img": img_base64,
+            "url": url_final,
+        })
+
+    except Exception as e:
+        return HttpResponseServerError(f"Error generando QR: {str(e)}")
+
+
+
+def obtener_url_cloudflare():
+    try:
+        with open("/tunnel_data/tunnel_url.txt", "r") as f:
+            contenido = f.read().strip()
+            print(f"📦 Leído desde archivo: {contenido}")
+            return contenido
+    except FileNotFoundError:
+        print("🚫 Archivo no encontrado")
+        return "URL no disponible"
+
+
+
+
+def generar_qr(request):
+    try:
+        ruta_log = "/app/tmp/tunnel_url.txt"
+
+        if not os.path.exists(ruta_log):
+            print("❌ El archivo tunnel_url.txt no existe")
+            return HttpResponse("Archivo no encontrado", status=500)
+
+        with open(ruta_log, "r") as f:
+            url = f.read().strip()
+
+        print(f"✅ URL obtenida desde el archivo: {url}")
+
+        if not url.startswith("http"):
+            print("❌ La URL no parece válida")
+            return HttpResponse("URL inválida", status=500)
 
         qr = qrcode.make(url)
         buffer = BytesIO()
         qr.save(buffer, format="PNG")
-        buffer.seek(0)
-        qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-        return render(request, 'qr_dashboard.html', {
-            'url': url,
-            'qr_data': qr_base64
-        })
+        buffer.seek(0)
+        print("✅ QR generado correctamente")
+        return HttpResponse(buffer.getvalue(), content_type="image/png")
+
     except Exception as e:
-        return HttpResponseServerError(f"Error generando el QR: {str(e)}")
+        print(f"🔥 Error en generar_qr: {e}")
+        return HttpResponse("Error interno del servidor", status=500)
+
+def mostrar_qr(request):
+    url_base = obtener_url_cloudflare()
+    token = "token-de-ejemplo"
+    url_completa = f"{url_base}/asistencia/?token={token}"
+
+    # Generar QR en memoria
+    qr = qrcode.make(url_completa)
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+
+    return render(request, "mostrar_qr.html", {
+        "qr_base64": img_str,
+        "url_completa": url_completa
+    })

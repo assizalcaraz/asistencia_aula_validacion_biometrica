@@ -1,0 +1,15 @@
+FROM alpine:latest
+
+# Instalamos herramientas necesarias
+RUN apk add --no-cache curl bash
+
+# Descargamos cloudflared
+RUN curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared \
+    && chmod +x /usr/local/bin/cloudflared
+
+# Creamos directorio de trabajo y copiamos el script
+WORKDIR /app
+COPY scripts/cloudflared-entry.sh /app/cloudflared-entry.sh
+RUN chmod +x /app/cloudflared-entry.sh
+
+ENTRYPOINT ["/app/cloudflared-entry.sh"]

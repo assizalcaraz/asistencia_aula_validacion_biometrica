@@ -1,0 +1,88 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Sonido 1 - Cátedra Costantini</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 2rem;
+            max-width: 600px;
+            margin: auto;
+        }
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 1.4rem;
+            margin: 0.5rem 0;
+        }
+        header img {
+            max-width: 120px;
+        }
+        #feedback {
+            animation: shake 0.4s ease-in-out;
+            color: red;
+            font-weight: bold;
+            list-style: none;
+            padding: 0;
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 1rem;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="email"] {
+            width: 100%;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            margin-top: 1.2rem;
+            padding: 0.6rem 1rem;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #debug {
+            margin-top: 1rem;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="{% static 'img/logo.png' %}" alt="Logo">
+        <h1>Sonido 1 - Cátedra Costantini</h1>
+    </header>
+
+    {% block content %}{% endblock %}
+</body>
+</html>
