@@ -4,6 +4,7 @@ import socket
 import base64
 import secrets
 from io import BytesIO
+import traceback
 
 # Librerías de terceros
 import qrcode
@@ -68,7 +69,26 @@ def generar_clave(clave_usuario):
     hash = sha256(clave_usuario.encode()).digest()
     return base64.urlsafe_b64encode(hash)
 
-@csrf_protect
+def derive_key_from_secret(secret, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    return base64.urlsafe_b64encode(kdf.derive(secret.encode()))
+
+def derive_system_key():
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b'static_salt_123',
+        iterations=100000,
+        backend=default_backend()
+    )
+    return base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
+
 def registrar_asistencia(request):
     if request.method == "POST":
         dni = request.POST.get("dni")
@@ -103,17 +123,46 @@ def registrar_asistencia(request):
             if not encodings:
                 return HttpResponse("No se detectó un rostro válido", status=400)
             unknown_encoding = encodings[0]
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Procesando selfie: {e}")
             return HttpResponse("Error al procesar la imagen", status=400)
 
         try:
             estudiante = Estudiante.objects.get(dni=dni)
-            key = derive_key_from_secret(clave, estudiante.salt)
+            print(f"[DEBUG] Estudiante encontrado: {estudiante.dni}")
+
+            if isinstance(estudiante.salt, str):
+                estudiante_salt = estudiante.salt.encode()
+            else:
+                estudiante_salt = estudiante.salt
+
+            print(f"[DEBUG] Salt (type={type(estudiante_salt)}): {estudiante_salt}")
+
+            key = derive_key_from_secret(clave, estudiante_salt)
             f = Fernet(key)
-            decrypted = f.decrypt(estudiante.encoding)
+
+            print("[DEBUG] Intentando descifrar encoding...")
+            encoding_bytes = estudiante.encoding
+            if isinstance(encoding_bytes, memoryview):
+                encoding_bytes = encoding_bytes.tobytes()
+            elif isinstance(encoding_bytes, str):
+                encoding_bytes = encoding_bytes.encode()
+
+            # Validar que sea un token válido antes de desencriptar
+            try:
+                decrypted = f.decrypt(encoding_bytes)
+            except Exception as e:
+                print(f"[ERROR] Falló el descifrado: {e}")
+                return HttpResponse("El rostro no coincide o la clave es incorrecta", status=403)
+
+            print("[DEBUG] Encoding descifrado correctamente.")
+
             known_encoding = np.frombuffer(decrypted, dtype=np.float64)
+            print(f"[DEBUG] known_encoding: {known_encoding[:5]}...")
 
             match = face_recognition.compare_faces([known_encoding], unknown_encoding)[0]
+            print(f"[DEBUG] Resultado de comparación facial: {match}")
+
             if not match:
                 return HttpResponse("El rostro no coincide o la clave es incorrecta", status=403)
 
@@ -125,16 +174,23 @@ def registrar_asistencia(request):
             return redirect("historial")
 
         except Estudiante.DoesNotExist:
+            print("[DEBUG] Estudiante no registrado. Redirigiendo a registro.")
             request.session['registro_dni'] = dni
             request.session['registro_clave'] = clave
             request.session['registro_selfie'] = selfie_data
             request.session['registro_token'] = token
             return redirect('registro')
+
         except Exception as e:
+            print(f"[ERROR] Validando asistencia: {e}")
+            import traceback
+            traceback.print_exc()
             return HttpResponse(f"Error interno: {str(e)}", status=500)
 
     token = request.GET.get("token", "")
     return render(request, "index.html", {"token": token})
+
+
 
 def registro(request):
     if request.method == "GET":
@@ -213,31 +269,7 @@ def historial(request):
     return render(request, "historial.html", {"asistencias": asistencias, "dni": dni})
 
 
-def derive_key_from_secret(secret, salt):
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-        backend=default_backend()
-    )
-    return base64.urlsafe_b64encode(kdf.derive(secret.encode()))
 
-
-def derive_system_key():
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b'static_salt_123',
-        iterations=100000,
-        backend=default_backend()
-    )
-    return base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
-
-
-def historial(request):
-    registros = Asistencia.objects.order_by('-timestamp')
-    return render(request, 'historial.html', {'registros': registros})
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -348,6 +380,7 @@ def mostrar_qr(request):
 ...
 
 @csrf_exempt
+@csrf_exempt
 def docente(request):
     if request.method == "POST":
         accion = request.POST.get("accion")
@@ -356,7 +389,9 @@ def docente(request):
 
         if accion == "crear" and dni:
             if not Estudiante.objects.filter(dni=dni).exists():
-                Estudiante.objects.create(dni=dni, email=email, encoding=b"", salt=b"")
+                fake_key = Fernet.generate_key()
+                fake_encoding = Fernet(fake_key).encrypt(b"placeholder_encoding")
+                Estudiante.objects.create(dni=dni, email=email, encoding=fake_encoding, salt=os.urandom(16))
         elif accion == "eliminar" and dni:
             Estudiante.objects.filter(dni=dni).delete()
 
@@ -382,7 +417,7 @@ def docente(request):
         "estudiantes": estudiantes,
         "faltantes": estudiantes_faltas
     })
-
+    
 def logout(request):
     request.session.flush()
     return redirect("index")

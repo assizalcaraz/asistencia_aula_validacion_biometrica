@@ -1,3 +1,36 @@
+## 📅 2025-04-06
+
+### ✅ Avances
+
+- Sistema de asistencia biométrica funcional en entorno local.
+- Reconocimiento facial usando `face_recognition` con `dlib`.
+- Encodings cifrados con clave derivada del DNI + clave secreta (`PBKDF2` + `Fernet`).
+- Registro de estudiantes con captura de selfie desde el navegador.
+- Validación de asistencia mediante comparación facial en tiempo real.
+- Redirección automática a `/registro/` si el DNI no está registrado.
+- Registro automático de asistencia al finalizar el alta del estudiante.
+- Panel `/docente/` con CRUD básico de estudiantes.
+- Listado de estudiantes sin asistencia (faltantes) con contador.
+- Migraciones automatizadas desde `entrypoint.sh`.
+- Validación de tokens únicos de un solo uso (proximidad aula).
+- Diseño responsive compatible con dispositivos móviles.
+
+### 🛠️ Problemas abordados
+
+- Importaciones circulares al organizar `models.py` y `views.py`.
+- Error `models not defined` en vista `docente`: resuelto.
+- Token no se enviaba correctamente al formulario: corregido.
+- Error `csrf_exempt` no definido: solucionado importando desde `django.views.decorators.csrf`.
+
+### 🔜 Próximos pasos
+
+- [ ] Bloquear múltiples DNIs registrados con una misma cara.
+- [ ] Bloquear múltiples caras para un mismo DNI.
+- [ ] Mostrar historial detallado por fecha.
+- [ ] Exportar asistencias a Google Sheets.
+- [ ] Empaquetar como solución lista para docentes no técnicos.
+
+
 ## 📅 2025-03-23
 
 ### ✅ Avances
