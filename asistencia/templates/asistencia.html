@@ -10,7 +10,7 @@
   </ul>
 {% endif %}
 
-<form method="POST" onsubmit="return enviarFormulario(event);">
+<form method="POST" action="{{ request.get_full_path }}" onsubmit="return enviarFormulario(event);">
   {% csrf_token %}
   <label>DNI:</label>
   <input type="text" name="dni" required>

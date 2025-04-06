@@ -7,5 +7,6 @@ urlpatterns = [
     path('ver_qr/', views.mostrar_qr, name='mostrar_qr'),
     path('generar_qr/', views.generar_qr, name='generar_qr'),
     path('qr/', views.qr_acceso, name='qr_acceso'),
-    path('asistencia/', views.registrar_asistencia, name='registrar_asistencia'),  # <- ESTA FALTA
+    path("registro/", views.registrar_estudiante, name="registro"),
+    path("asistencia/", views.registrar_asistencia, name="asistencia"),
 ]

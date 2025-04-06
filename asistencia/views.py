@@ -18,11 +18,87 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 # Django
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseServerError
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib import messages
+
+
 
 # Modelos locales
 from .models import Asistencia, Estudiante
+
+def generar_clave(clave_usuario):
+    from hashlib import sha256
+    hash = sha256(clave_usuario.encode()).digest()
+    return base64.urlsafe_b64encode(hash)
+
+@csrf_exempt  # Si estás en desarrollo y necesitás testear sin CSRF
+def registrar_estudiante(request):
+    if request.method == 'POST':
+        dni = request.POST.get('dni')
+        clave = request.POST.get('clave')
+        selfie_base64 = request.POST.get('selfie')
+
+        if not selfie_base64 or not dni or not clave:
+            messages.error(request, "Todos los campos son obligatorios.")
+            return render(request, 'registro.html')
+
+        if Estudiante.objects.filter(dni=dni).exists():
+            messages.error(request, "Ese DNI ya está registrado.")
+            return render(request, 'registro.html')
+
+        # Convertir imagen a array numpy
+        try:
+            formato, datos = selfie_base64.split(';base64,')
+            imagen_bytes = base64.b64decode(datos)
+            np_arr = np.frombuffer(imagen_bytes, np.uint8)
+            import cv2
+            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        except Exception:
+            messages.error(request, "Error al procesar la imagen.")
+            return render(request, 'registro.html')
+
+        # Extraer encoding facial
+        try:
+            encoding = face_recognition.face_encodings(rgb_img)[0]
+        except IndexError:
+            messages.error(request, "No se detectó un rostro válido.")
+            return render(request, 'registro.html')
+
+        # Cifrar el encoding con clave
+        clave_cifrado = generar_clave(clave)
+        f = Fernet(clave_cifrado)
+        encoding_bytes = encoding.tobytes()
+        encoding_cifrado = f.encrypt(encoding_bytes)
+
+        # Verificar si ya hay un encoding igual
+        estudiantes = Estudiante.objects.all()
+        for est in estudiantes:
+            try:
+                f_test = Fernet(clave_cifrado)
+                encoding_descifrado = f_test.decrypt(est.encoding)
+                e2 = np.frombuffer(encoding_descifrado, dtype=np.float64)
+                distancia = np.linalg.norm(encoding - e2)
+                if distancia < 0.5:
+                    messages.error(request, "Esa cara ya está registrada con otro DNI.")
+                    return render(request, 'registro.html')
+            except Exception:
+                continue  # No se puede descifrar => no es la misma clave => se ignora
+
+        # Guardar en DB
+        Estudiante.objects.create(
+            dni=dni,
+            encoding=encoding_cifrado,
+            salt=b'',  # Placeholder si luego implementás salting manual
+        )
+        messages.success(request, "✅ Registro exitoso.")
+        return redirect('asistencia')
+
+    return render(request, 'registro.html')
+
+
 
 def derive_key_from_secret(secret: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(
@@ -91,9 +167,47 @@ def get_local_ip():
 
 
 
+@csrf_exempt
 def registrar_asistencia(request):
-    token = request.GET.get("token", "no-token")
-    return HttpResponse(f"Asistencia recibida con token: {token}")
+    if request.method == 'POST':
+        dni = request.POST.get('dni')
+        clave = request.POST.get('clave')
+        selfie_data = request.POST.get('selfie')
+        token = request.GET.get("token", "no-token")
+
+        if not dni or not clave or not selfie_data:
+            return HttpResponse("Faltan datos requeridos", status=400)
+
+        # Procesar la selfie recibida
+        try:
+            selfie_bytes = base64.b64decode(selfie_data.split(",")[1])
+            img = face_recognition.load_image_file(BytesIO(selfie_bytes))
+            unknown_encoding = face_recognition.face_encodings(img)[0]
+        except Exception:
+            return HttpResponse("No se detectó un rostro válido", status=400)
+
+        # Buscar estudiante y validar rostro
+        try:
+            estudiante = Estudiante.objects.get(dni=dni)
+            key = derive_key_from_secret(clave, estudiante.salt)
+            f = Fernet(key)
+            decrypted = f.decrypt(estudiante.encoding)
+            known_encoding = np.frombuffer(decrypted, dtype=np.float64)
+
+            match = face_recognition.compare_faces([known_encoding], unknown_encoding)[0]
+            if not match:
+                return HttpResponse("El rostro no coincide o la clave es incorrecta", status=403)
+
+            # Si todo está bien, registrar asistencia
+            Asistencia.objects.create(dni=dni, foto="capturada_por_selfie")
+            return HttpResponse(f"✅ Asistencia registrada correctamente para {dni} con token {token}")
+
+        except Estudiante.DoesNotExist:
+            return HttpResponse("DNI no registrado", status=404)
+        except Exception as e:
+            return HttpResponse(f"Error interno: {str(e)}", status=500)
+
+    return render(request, "asistencia.html")  # Formulario HTML que pide DNI, clave y selfie
 
 
 def qr_acceso(request):
