@@ -7,6 +7,10 @@ urlpatterns = [
     path('ver_qr/', views.mostrar_qr, name='mostrar_qr'),
     path('generar_qr/', views.generar_qr, name='generar_qr'),
     path('qr/', views.qr_acceso, name='qr_acceso'),
-    path("registro/", views.registrar_estudiante, name="registro"),
-    path("asistencia/", views.registrar_asistencia, name="asistencia"),
+    path('registro/', views.registro, name='registro'),  # <- CORREGIDO
+    path('asistencia/', views.registrar_asistencia, name='asistencia'),
+    path('docente/', views.docente, name='docente'),
+
+    path('logout/', views.logout, name='logout'),
+
 ]

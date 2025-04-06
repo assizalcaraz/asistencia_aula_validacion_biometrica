@@ -20,135 +20,220 @@ from django.conf import settings
 from django.http import HttpResponse, HttpResponseServerError
 from django.shortcuts import render, redirect
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt
+# Librerías estándar
+import os
+import socket
+import base64
+import secrets
+from io import BytesIO
+
+# Librerías de terceros
+import qrcode
+import numpy as np
+import netifaces
+import face_recognition
+from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# Django
+from django.conf import settings
+from django.http import HttpResponse, HttpResponseServerError
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from django.contrib import messages
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt
+from django.db import models
 
 
 
 # Modelos locales
-from .models import Asistencia, Estudiante
+from .models import Asistencia, Estudiante, TokenAcceso
+
+def index(request):
+    token = request.GET.get("token")
+    if not token:
+        return HttpResponse("Token no proporcionado", status=400)
+
+    if request.method == "GET":
+        return render(request, "index.html", {"token": token})
 
 def generar_clave(clave_usuario):
     from hashlib import sha256
     hash = sha256(clave_usuario.encode()).digest()
     return base64.urlsafe_b64encode(hash)
 
-@csrf_exempt  # Si estás en desarrollo y necesitás testear sin CSRF
-def registrar_estudiante(request):
-    if request.method == 'POST':
-        dni = request.POST.get('dni')
-        clave = request.POST.get('clave')
-        selfie_base64 = request.POST.get('selfie')
+@csrf_protect
+def registrar_asistencia(request):
+    if request.method == "POST":
+        dni = request.POST.get("dni")
+        clave = request.POST.get("clave")
+        selfie_data = request.POST.get("selfie")
+        token = request.GET.get("token") or request.POST.get("token")
 
-        if not selfie_base64 or not dni or not clave:
-            messages.error(request, "Todos los campos son obligatorios.")
-            return render(request, 'registro.html')
+        faltantes = []
+        if not dni: faltantes.append("dni")
+        if not clave: faltantes.append("clave")
+        if not selfie_data: faltantes.append("selfie")
+        if not token: faltantes.append("token")
 
-        if Estudiante.objects.filter(dni=dni).exists():
-            messages.error(request, "Ese DNI ya está registrado.")
-            return render(request, 'registro.html')
+        if faltantes:
+            return HttpResponse(f"Faltan datos requeridos: {', '.join(faltantes)}", status=400)
 
-        # Convertir imagen a array numpy
         try:
-            formato, datos = selfie_base64.split(';base64,')
-            imagen_bytes = base64.b64decode(datos)
-            np_arr = np.frombuffer(imagen_bytes, np.uint8)
-            import cv2
-            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            acceso = TokenAcceso.objects.get(token=token)
+            if acceso.usado:
+                return HttpResponse("Token ya fue utilizado", status=403)
+
+            ahora = timezone.now()
+            if (ahora - acceso.creado).total_seconds() > acceso.vencimiento:
+                return HttpResponse("Token expirado", status=403)
+        except TokenAcceso.DoesNotExist:
+            return HttpResponse("Token inválido", status=403)
+
+        try:
+            selfie_bytes = base64.b64decode(selfie_data.split(",")[1])
+            img = face_recognition.load_image_file(BytesIO(selfie_bytes))
+            encodings = face_recognition.face_encodings(img)
+            if not encodings:
+                return HttpResponse("No se detectó un rostro válido", status=400)
+            unknown_encoding = encodings[0]
         except Exception:
-            messages.error(request, "Error al procesar la imagen.")
-            return render(request, 'registro.html')
-
-        # Extraer encoding facial
-        try:
-            encoding = face_recognition.face_encodings(rgb_img)[0]
-        except IndexError:
-            messages.error(request, "No se detectó un rostro válido.")
-            return render(request, 'registro.html')
-
-        # Cifrar el encoding con clave
-        clave_cifrado = generar_clave(clave)
-        f = Fernet(clave_cifrado)
-        encoding_bytes = encoding.tobytes()
-        encoding_cifrado = f.encrypt(encoding_bytes)
-
-        # Verificar si ya hay un encoding igual
-        estudiantes = Estudiante.objects.all()
-        for est in estudiantes:
-            try:
-                f_test = Fernet(clave_cifrado)
-                encoding_descifrado = f_test.decrypt(est.encoding)
-                e2 = np.frombuffer(encoding_descifrado, dtype=np.float64)
-                distancia = np.linalg.norm(encoding - e2)
-                if distancia < 0.5:
-                    messages.error(request, "Esa cara ya está registrada con otro DNI.")
-                    return render(request, 'registro.html')
-            except Exception:
-                continue  # No se puede descifrar => no es la misma clave => se ignora
-
-        # Guardar en DB
-        Estudiante.objects.create(
-            dni=dni,
-            encoding=encoding_cifrado,
-            salt=b'',  # Placeholder si luego implementás salting manual
-        )
-        messages.success(request, "✅ Registro exitoso.")
-        return redirect('asistencia')
-
-    return render(request, 'registro.html')
-
-
-
-def derive_key_from_secret(secret: str, salt: bytes) -> bytes:
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100_000,
-        backend=default_backend()
-    )
-    return base64.urlsafe_b64encode(kdf.derive(secret.encode()))
-
-def index(request):
-    if request.method == 'POST':
-        dni = request.POST.get('dni')
-        clave = request.POST.get('clave')
-        selfie_data = request.POST.get('selfie')
-
-        if not dni or not clave or not selfie_data:
-            return HttpResponse("Datos incompletos", status=400)
-
-        unknown_image = face_recognition.load_image_file(BytesIO(base64.b64decode(selfie_data.split(',')[1])))
-        unknown_encodings = face_recognition.face_encodings(unknown_image)
-        if not unknown_encodings:
-            return HttpResponse("No se detectó rostro en la imagen enviada", status=400)
-        unknown_encoding = unknown_encodings[0]
+            return HttpResponse("Error al procesar la imagen", status=400)
 
         try:
             estudiante = Estudiante.objects.get(dni=dni)
             key = derive_key_from_secret(clave, estudiante.salt)
-            fernet = Fernet(key)
-            decrypted = fernet.decrypt(estudiante.encoding)
+            f = Fernet(key)
+            decrypted = f.decrypt(estudiante.encoding)
             known_encoding = np.frombuffer(decrypted, dtype=np.float64)
 
             match = face_recognition.compare_faces([known_encoding], unknown_encoding)[0]
             if not match:
-                return HttpResponse("El rostro no coincide con el registrado o la clave es incorrecta", status=403)
+                return HttpResponse("El rostro no coincide o la clave es incorrecta", status=403)
+
+            Asistencia.objects.create(dni=dni, foto="capturada_por_selfie")
+            acceso.usado = True
+            acceso.save()
+
+            request.session["dni"] = dni
+            return redirect("historial")
+
         except Estudiante.DoesNotExist:
-            salt = secrets.token_bytes(16)
-            key = derive_key_from_secret(clave, salt)
-            fernet = Fernet(key)
-            encoding_bytes = unknown_encoding.astype(np.float64).tobytes()
-            encrypted = fernet.encrypt(encoding_bytes)
-            Estudiante.objects.create(dni=dni, encoding=encrypted, salt=salt)
+            request.session['registro_dni'] = dni
+            request.session['registro_clave'] = clave
+            request.session['registro_selfie'] = selfie_data
+            request.session['registro_token'] = token
+            return redirect('registro')
         except Exception as e:
-            return HttpResponse(f"Error procesando los datos: {str(e)}", status=500)
+            return HttpResponse(f"Error interno: {str(e)}", status=500)
 
-        Asistencia.objects.create(dni=dni, foto="capturada_con_selfie")
-        return HttpResponse(f"Asistencia registrada para DNI {dni}")
+    token = request.GET.get("token", "")
+    return render(request, "index.html", {"token": token})
 
-    return render(request, 'index.html')
+def registro(request):
+    if request.method == "GET":
+        dni = request.session.get('registro_dni', '')
+        clave = request.session.get('registro_clave', '')
+        selfie = request.session.get('registro_selfie', '')
+        token = request.session.get('registro_token', '')
+        return render(request, 'registro.html', {
+            "dni": dni,
+            "clave": clave,
+            "selfie": selfie,
+            "token": token
+        })
+
+    elif request.method == "POST":
+        dni = request.POST.get("dni")
+        clave = request.POST.get("clave")
+        email = request.POST.get("email")
+        selfie_data = request.POST.get("selfie")
+        token = request.POST.get("token")
+
+        try:
+            header, encoded = selfie_data.split(',', 1)
+            image_data = base64.b64decode(encoded)
+            image_array = np.array(face_recognition.load_image_file(BytesIO(image_data)))
+            encoding = face_recognition.face_encodings(image_array)[0]
+        except Exception as e:
+            return HttpResponse(f"Error al procesar la selfie: {str(e)}", status=400)
+
+        # Rechazar si el rostro ya está registrado con otro DNI
+        system_key = derive_system_key()
+        fernet_sys = Fernet(system_key)
+
+        for est in Estudiante.objects.all():
+            try:
+                decrypted = fernet_sys.decrypt(est.encoding)
+                existing_encoding = np.frombuffer(decrypted, dtype=np.float64)
+                if face_recognition.compare_faces([existing_encoding], encoding)[0]:
+                    return HttpResponse("Este rostro ya está registrado con otro DNI.", status=409)
+            except Exception:
+                continue
+
+        # Encriptar el encoding con la clave del sistema para poder hacer comparación futura
+        encrypted_encoding = fernet_sys.encrypt(encoding.tobytes())
+        salt = b'static_salt_123'  # puede hacerse dinámico si se desea reforzar, pero ya tenemos clave única
+
+        Estudiante.objects.create(
+            dni=dni,
+            email=email,
+            encoding=encrypted_encoding,
+            salt=salt
+        )
+
+        Asistencia.objects.create(dni=dni, foto="capturada_por_selfie")
+
+        try:
+            acceso = TokenAcceso.objects.get(token=token)
+            acceso.usado = True
+            acceso.save()
+        except TokenAcceso.DoesNotExist:
+            pass
+
+        request.session["dni"] = dni
+        messages.success(request, "Estudiante registrado y asistencia marcada correctamente.")
+        return redirect("historial")
+
+    return HttpResponse("Método no permitido", status=405)
+
+
+def historial(request):
+    dni = request.session.get("dni")
+    if not dni:
+        return redirect("index")
+
+    asistencias = Asistencia.objects.filter(dni=dni).order_by("-timestamp")
+    return render(request, "historial.html", {"asistencias": asistencias, "dni": dni})
+
+
+def derive_key_from_secret(secret, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    return base64.urlsafe_b64encode(kdf.derive(secret.encode()))
+
+
+def derive_system_key():
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b'static_salt_123',
+        iterations=100000,
+        backend=default_backend()
+    )
+    return base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
+
 
 def historial(request):
     registros = Asistencia.objects.order_by('-timestamp')
@@ -164,51 +249,6 @@ def get_local_ip():
     finally:
         s.close()
     return ip
-
-
-
-@csrf_exempt
-def registrar_asistencia(request):
-    if request.method == 'POST':
-        dni = request.POST.get('dni')
-        clave = request.POST.get('clave')
-        selfie_data = request.POST.get('selfie')
-        token = request.GET.get("token", "no-token")
-
-        if not dni or not clave or not selfie_data:
-            return HttpResponse("Faltan datos requeridos", status=400)
-
-        # Procesar la selfie recibida
-        try:
-            selfie_bytes = base64.b64decode(selfie_data.split(",")[1])
-            img = face_recognition.load_image_file(BytesIO(selfie_bytes))
-            unknown_encoding = face_recognition.face_encodings(img)[0]
-        except Exception:
-            return HttpResponse("No se detectó un rostro válido", status=400)
-
-        # Buscar estudiante y validar rostro
-        try:
-            estudiante = Estudiante.objects.get(dni=dni)
-            key = derive_key_from_secret(clave, estudiante.salt)
-            f = Fernet(key)
-            decrypted = f.decrypt(estudiante.encoding)
-            known_encoding = np.frombuffer(decrypted, dtype=np.float64)
-
-            match = face_recognition.compare_faces([known_encoding], unknown_encoding)[0]
-            if not match:
-                return HttpResponse("El rostro no coincide o la clave es incorrecta", status=403)
-
-            # Si todo está bien, registrar asistencia
-            Asistencia.objects.create(dni=dni, foto="capturada_por_selfie")
-            return HttpResponse(f"✅ Asistencia registrada correctamente para {dni} con token {token}")
-
-        except Estudiante.DoesNotExist:
-            return HttpResponse("DNI no registrado", status=404)
-        except Exception as e:
-            return HttpResponse(f"Error interno: {str(e)}", status=500)
-
-    return render(request, "asistencia.html")  # Formulario HTML que pide DNI, clave y selfie
-
 
 def qr_acceso(request):
     try:
@@ -241,8 +281,6 @@ def qr_acceso(request):
     except Exception as e:
         return HttpResponseServerError(f"Error generando QR: {str(e)}")
 
-
-
 def obtener_url_cloudflare():
     try:
         with open("/tunnel_data/tunnel_url.txt", "r") as f:
@@ -252,9 +290,6 @@ def obtener_url_cloudflare():
     except FileNotFoundError:
         print("🚫 Archivo no encontrado")
         return "URL no disponible"
-
-
-
 
 def generar_qr(request):
     try:
@@ -288,9 +323,18 @@ def generar_qr(request):
 def mostrar_qr(request):
     url_base = obtener_url_cloudflare()
     token = "token-de-ejemplo"
+
+    # Agrega el token si no existe
+    if not TokenAcceso.objects.filter(token=token).exists():
+        TokenAcceso.objects.create(
+            token=token,
+            vencimiento=300,
+            creado=timezone.now(),
+            usado=False
+        )
+
     url_completa = f"{url_base}/asistencia/?token={token}"
 
-    # Generar QR en memoria
     qr = qrcode.make(url_completa)
     buffer = BytesIO()
     qr.save(buffer, format="PNG")
@@ -300,3 +344,45 @@ def mostrar_qr(request):
         "qr_base64": img_str,
         "url_completa": url_completa
     })
+
+...
+
+@csrf_exempt
+def docente(request):
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        dni = request.POST.get("dni")
+        email = request.POST.get("email", "")
+
+        if accion == "crear" and dni:
+            if not Estudiante.objects.filter(dni=dni).exists():
+                Estudiante.objects.create(dni=dni, email=email, encoding=b"", salt=b"")
+        elif accion == "eliminar" and dni:
+            Estudiante.objects.filter(dni=dni).delete()
+
+    estudiantes = Estudiante.objects.all().order_by("dni")
+
+    asistencias = Asistencia.objects.values("dni").annotate(
+        total=models.Count("id")
+    )
+    asistencias_dict = {a["dni"]: a["total"] for a in asistencias}
+
+    estudiantes_faltas = []
+    for estudiante in estudiantes:
+        dni = estudiante.dni
+        total_asistencias = asistencias_dict.get(dni, 0)
+        if total_asistencias == 0:
+            estudiantes_faltas.append({
+                "dni": dni,
+                "email": estudiante.email,
+                "faltas": "Ninguna asistencia"
+            })
+
+    return render(request, "docente.html", {
+        "estudiantes": estudiantes,
+        "faltantes": estudiantes_faltas
+    })
+
+def logout(request):
+    request.session.flush()
+    return redirect("index")

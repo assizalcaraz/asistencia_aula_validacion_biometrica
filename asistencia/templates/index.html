@@ -3,41 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <title>Registro de Asistencia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
             color: #333;
-            padding: 2rem;
-            max-width: 600px;
-            margin: auto;
+            margin: 0;
+            padding: 1rem;
         }
+
         h1 {
             text-align: center;
+            font-size: 1.5rem;
         }
+
         form {
             background: white;
-            padding: 2rem;
+            padding: 1rem;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 95%;
+            max-width: 500px;
+            margin: auto;
         }
+
         label {
             font-weight: bold;
             display: block;
             margin-top: 1rem;
+            font-size: 0.9rem;
         }
+
         input[type="text"],
-        input[type="password"],
-        input[type="email"] {
+        input[type="password"] {
             width: 100%;
-            padding: 0.5rem;
-            margin-top: 0.5rem;
+            padding: 0.6rem;
+            font-size: 1rem;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
+
         button {
             margin-top: 1.5rem;
-            padding: 0.6rem 1.2rem;
+            width: 100%;
+            padding: 0.7rem;
             border: none;
             background-color: #007BFF;
             color: white;
@@ -45,39 +59,66 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
         button:hover {
             background-color: #0056b3;
         }
+
         #debug {
             margin-top: 1rem;
             color: red;
+            font-size: 0.9rem;
         }
+
         #video, #canvas {
             display: none;
+        }
+
+        .disclaimer {
+            font-size: 0.85rem;
+            margin: 1.5rem auto 0;
+            padding: 1rem;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            width: 95%;
+            max-width: 500px;
         }
     </style>
 </head>
 <body>
     <h1>Registro de Asistencia</h1>
-    <form method="POST" onsubmit="return capturarYEnviar(event);">
+    <form method="POST" action="{% url 'asistencia' %}" onsubmit="return capturarYEnviar(event);">
         {% csrf_token %}
+        {% if token %}
+            <input type="hidden" name="token" value="{{ token }}">
+        {% else %}
+            <p style="color: red;">⚠️ Error: falta el token de validación.</p>
+        {% endif %}
+    
         <label for="dni">DNI:</label>
         <input type="text" id="dni" name="dni" required>
-
+    
         <label for="clave">Clave Secreta:</label>
         <input type="password" id="clave" name="clave" required>
-
-        <label for="email">Email (solo para registro):</label>
-        <input type="email" id="email" name="email">
-
+    
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas"></canvas>
         <input type="hidden" name="selfie" id="selfie">
-
+    
         <button type="submit">Enviar Asistencia</button>
-
+    
         <div id="debug"></div>
     </form>
+    
+    
+
+    <div class="disclaimer">
+        Al enviar este formulario, aceptás que se utilice tu rostro como segundo factor de verificación de identidad.<br>
+        La selfie no se almacena, solo se usa en el momento para validar tu presencia.<br>
+        Tus datos están cifrados y protegidos.<br>
+        Si es tu primer ingreso, serás redirigido automáticamente al registro.
+    </div>
 
     <script>
         const video = document.getElementById('video');
@@ -105,7 +146,6 @@
                 return false;
             }
 
-            // Captura automática antes de enviar
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -115,7 +155,7 @@
             if (dataURL.length > 100) {
                 selfieInput.value = dataURL;
                 debug.innerText = '✅ Selfie capturada. Enviando...';
-                event.target.submit();  // Envío del formulario
+                event.target.submit();
             } else {
                 debug.innerText = '❌ Error: no se pudo capturar la selfie';
             }

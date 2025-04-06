@@ -1,29 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
     <title>Historial de Asistencias</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #eef2f3;
+            padding: 2rem;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .dni-info {
+            text-align: center;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 0.8rem;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+
+        .logout {
+            display: block;
+            margin: 2rem auto 0;
+            padding: 0.7rem 1.5rem;
+            background-color: #dc3545;
+            color: white;
+            text-align: center;
+            width: fit-content;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+
+        .logout:hover {
+            background-color: #c82333;
+        }
+    </style>
 </head>
 <body>
     <h1>Historial de Asistencias</h1>
-    <table border="1" cellpadding="5">
+
+    <div class="dni-info">
+        Estás logueado como: <strong>{{ dni }}</strong>
+    </div>
+
+    <table>
         <thead>
             <tr>
-                <th>DNI</th>
                 <th>Fecha y hora</th>
-                <th>Foto</th>
             </tr>
         </thead>
         <tbody>
-            {% for registro in registros %}
+            {% for registro in asistencias %}
             <tr>
-                <td>{{ registro.dni }}</td>
                 <td>{{ registro.timestamp }}</td>
-                <td>
-                    <img src="data:image/png;base64,{{ qr_data }}" alt="Código QR">
-                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td>No hay asistencias registradas.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <a href="{% url 'logout' %}" class="logout">Cerrar sesión</a>
 </body>
 </html>

@@ -87,3 +87,13 @@ CSRF_TRUSTED_ORIGINS = [
     f"https://{os.environ.get('DJANGO_HOST_IP', 'localhost')}",
     "https://*.trycloudflare.com",
 ]
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://redis:6379/1",  # adaptá el host según tu contenedor
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
