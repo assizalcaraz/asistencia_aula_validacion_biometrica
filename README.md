@@ -1,40 +1,97 @@
-```markdown
-# Asistencia Facial con Reconocimiento Biométrico y Código QR
+# Asistencia en Aulas Validada por Reconocimiento Biométrico y Código QR
 
-Este proyecto permite registrar asistencia en el aula escaneando un código QR, accediendo a una interfaz web local que utiliza reconocimiento facial y validación mediante clave secreta.
+Este proyecto implementa un sistema completo de validación de asistencia universitaria mediante reconocimiento facial, geolocalización y autenticación segura, todo accesible desde el navegador sin necesidad de instalar apps. Es accesible vía túnel Cloudflare, lo que permite certificados HTTPS válidos desde una notebook local.
 
-## Funcionalidades principales
+---
 
-- ✅ Registro de estudiantes con imagen facial y clave cifrada.
-- ✅ Validación de asistencia mediante selfie y clave.
-- ✅ Generación dinámica de código QR con la IP local del servidor.
-- ✅ Interfaz accesible desde celulares (funciona en red local o hotspot).
-- ✅ Captura de cámara directamente en el navegador (sin app instalada).
-- ✅ Docker + Nginx + Django para despliegue local con HTTPS.
+## 🎯 Objetivo del Proyecto
 
-## Tecnologías utilizadas
+Desarrollar un sistema de asistencia robusto que funcione en red local o internet, minimizando el fraude por reenvío de QR, suplantación de identidad o validación remota.
 
-- Django
-- OpenCV + face_recognition
-- Docker & Docker Compose
-- Nginx (reverse proxy con certificados autofirmados)
-- SQLite (para desarrollo)
-- HTML5 + JS (captura de cámara en navegador)
+---
 
-## Cómo ejecutar
+## 🧩 Tecnologías utilizadas
 
-```bash
-docker compose down
-docker compose build
-docker compose up -d
-```
+- Django 5 (backend)
+- Docker + Docker Compose
+- face_recognition + dlib (biometría)
+- Cryptography (Fernet + PBKDF2HMAC)
+- Cloudflare Tunnel (exposición pública)
+- geopy (validación geográfica)
+- HTML5 + JavaScript (cámara y ubicación)
 
-Asegurate de acceder desde un dispositivo conectado a la misma red local.
+---
 
-## Recomendaciones de seguridad
+## 🛠️ Flujo de funcionamiento
 
-- Validar configuración del firewall si se usa en red compartida.
-- Verificar certificados HTTPS si se accede desde dispositivos Apple.
-- Se recomienda mover a producción con certificados reales (Let’s Encrypt).
-```
+### 1. Generación de QR
+- `/ver_qr_auto/` genera un QR dinámico cada 40 segundos.
+- El QR lleva al estudiante al endpoint `/asistencia/?token=...`.
 
+### 2. Validación de asistencia
+- El estudiante escanea el QR desde su celular.
+- El navegador solicita cámara y ubicación.
+- Se captura selfie, se ingresa la clave secreta y se envía junto con coordenadas y token único.
+
+### 3. Verificación
+- Se valida token, IP, zona geográfica.
+- Se descifra embedding facial usando la clave secreta.
+- Se compara con la selfie en tiempo real.
+- Si coincide, se registra la asistencia en la base de datos.
+
+---
+
+## 📍 Seguridad y Antifraude
+
+- QR rotativo cada 40 segundos
+- Validación facial y por clave secreta
+- Verificación de IP y zona (dentro de 100m de FADU Ciudad Universitaria)
+- Uso único por día del mismo dispositivo/token
+
+---
+
+## 💾 Almacenamiento
+
+- Se registra:
+  - DNI
+  - Email
+  - Embedding facial cifrado
+  - Salt individual
+  - Timestamp
+  - IP
+- Las selfies no se almacenan (efímeras)
+
+---
+
+## 👩‍🏫 Panel Docente
+
+- URL: `/docente/`
+- Crear y eliminar estudiantes
+- Ver ausentes y presentes
+- Revisar historial completo de asistencias
+
+---
+
+## 📉 Problemas abordados
+
+- ❌ Reenvío de QR → mitigado con tokens únicos + IP
+- ❌ Suplantación → biometría + clave cifrada
+- ❌ Validación remota → validación geográfica por GPS/IP
+- ❌ Expiración del túnel → monitoreo de Cloudflare Tunnel activo
+- ❌ Geolocalización en iOS → modal con botón para forzar permisos
+
+---
+
+## 🔮 Posibles mejoras
+
+- Autenticación SSO institucional
+- Exportación a Google Sheets
+- Integración con aulas virtuales
+- Reconocimiento de voz como 3er factor
+
+---
+
+## ✍️ Autor
+
+**José Assiz Alcaraz Baxter**  
+[LinkedIn](https://www.linkedin.com/in/assizalcaraz) | [GitHub](https://github.com/assizalcaraz)

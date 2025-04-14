@@ -1,0 +1,46 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django migrations and SQLite
+*.sqlite3
+db.sqlite3
+*.log
+*.pot
+
+# Env variables
+.env
+.env.*
+
+# VSCode
+.vscode/
+
+# macOS system files
+.DS_Store
+
+# Docker artifacts
+*.pid
+*.bak
+*.seed
+
+# Static/media content
+/static/
+media/
+
+# SSL certificates (manual)
+nginx/certs/
+*.crt
+*.key
+
+# Personal biometric data and examples
+rostros/
+selfies/
+validador_local.zip
+
+# Compiled Python cache inside folders
+**/__pycache__/
+
+# Other
+*.pem
