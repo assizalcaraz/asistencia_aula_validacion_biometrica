@@ -13,3 +13,4 @@ COPY scripts/cloudflared-entry.sh /app/cloudflared-entry.sh
 RUN chmod +x /app/cloudflared-entry.sh
 
 ENTRYPOINT ["/app/cloudflared-entry.sh"]
+

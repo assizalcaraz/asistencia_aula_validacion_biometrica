@@ -7,3 +7,4 @@ pillow
 cryptography
 netifaces 
 django-redis
+geopy

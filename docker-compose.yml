@@ -9,25 +9,24 @@ services:
     environment:
       DJANGO_HOST_IP: 192.168.1.16
     volumes:
-    - tunnel_data:/tunnel_data  # <--- en web
+      - tunnel_data:/tunnel_data
     networks:
       - app_net
+    depends_on:
+      - nginx
 
   cf_tunnel:
     build:
       context: .
       dockerfile: Dockerfile.cf_tunnel
     container_name: cf_tunnel
-    command: ["/bin/sh", "/app/cloudflared-entry.sh"]
+    command: ["/bin/sh", "/app/scripts/cloudflared-entry.sh"]
     volumes:
       - tunnel_data:/tunnel_data
     networks:
       - app_net
     depends_on:
       - web
-
-
-
 
   nginx:
     image: nginx:latest
@@ -37,8 +36,6 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/certs:/etc/nginx/certs
-    depends_on:
-      - web
     networks:
       - app_net
 

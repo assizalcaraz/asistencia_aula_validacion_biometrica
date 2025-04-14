@@ -56,56 +56,81 @@
     </style>
 </head>
 <body>
-    <h1>Panel de Control Docente</h1>
+<h1>Panel de Control Docente</h1>
 
-    <section>
-        <h2>Estudiantes Registrados</h2>
-        <form method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="crear">
-            <input type="text" name="dni" placeholder="DNI" required>
-            <input type="email" name="email" placeholder="Email">
-            <button type="submit">➕ Crear</button>
-        </form>
-        <table>
-            <thead>
-                <tr><th>DNI</th><th>Email</th><th>Acciones</th></tr>
-            </thead>
-            <tbody>
-                {% for e in estudiantes %}
-                <tr>
-                    <td>{{ e.dni }}</td>
-                    <td>{{ e.email }}</td>
-                    <td>
-                        <form method="POST" style="display:inline;">
-                            {% csrf_token %}
-                            <input type="hidden" name="accion" value="eliminar">
-                            <input type="hidden" name="dni" value="{{ e.dni }}">
-                            <button type="submit">❌ Eliminar</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
+<section>
+    <h2>Estudiantes Registrados</h2>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="crear">
+        <input type="text" name="dni" placeholder="DNI" required>
+        <input type="email" name="email" placeholder="Email">
+        <button type="submit">➕ Crear</button>
+    </form>cd 
+    <table>
+        <thead>
+        <tr><th>DNI</th><th>Email</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+        {% for e in estudiantes %}
+        <tr>
+            <td>{{ e.dni }}</td>
+            <td>{{ e.email }}</td>
+            <td>
+                <form method="POST" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="eliminar">
+                    <input type="hidden" name="dni" value="{{ e.dni }}">
+                    <button type="submit">❌ Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
 
-    <section>
-        <h2>Estudiantes sin asistencia registrada</h2>
-        <table>
-            <thead>
-                <tr><th>DNI</th><th>Email</th><th>Estado</th></tr>
-            </thead>
-            <tbody>
-                {% for f in faltantes %}
-                <tr>
-                    <td>{{ f.dni }}</td>
-                    <td>{{ f.email }}</td>
-                    <td>{{ f.faltas }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
+<section>
+    <h2>Estudiantes sin asistencia registrada</h2>
+    <table>
+        <thead>
+        <tr><th>DNI</th><th>Email</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+        {% for f in faltantes %}
+        <tr>
+            <td>{{ f.dni }}</td>
+            <td>{{ f.email }}</td>
+            <td>{{ f.faltas }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section>
+    <h2>Asistencias Registradas</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha y Hora</th>
+                <th>DNI</th>
+                <th>Origen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for asistencia in asistencias_cronologicas %}
+            <tr>
+                <td>{{ asistencia.timestamp|date:"d/m/Y H:i:s" }}</td>
+                <td>{{ asistencia.dni }}</td>
+                
+            </tr>
+            {% empty %}
+            <tr><td colspan="3">No hay asistencias registradas aún.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
 </body>
 </html>

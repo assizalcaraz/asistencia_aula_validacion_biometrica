@@ -9,27 +9,44 @@
             box-sizing: border-box;
         }
 
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            color: #333;
+        body, html {
             margin: 0;
-            padding: 1rem;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
         }
 
-        h1 {
-            text-align: center;
-            font-size: 1.5rem;
+        .camera-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
         form {
-            background: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(50, 50, 50, 0.8);
             padding: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            width: 95%;
-            max-width: 500px;
-            margin: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            z-index: 2;
+            width: 90%;
+            max-width: 400px;
         }
 
         label {
@@ -46,6 +63,8 @@
             font-size: 1rem;
             border: 1px solid #ccc;
             border-radius: 4px;
+            background: #fff;
+            color: #000;
         }
 
         button {
@@ -53,7 +72,7 @@
             width: 100%;
             padding: 0.7rem;
             border: none;
-            background-color: #007BFF;
+            background-color: #28a745;
             color: white;
             font-size: 1rem;
             border-radius: 4px;
@@ -61,107 +80,145 @@
         }
 
         button:hover {
-            background-color: #0056b3;
+            background-color: #218838;
         }
 
         #debug {
             margin-top: 1rem;
-            color: red;
+            color: yellow;
             font-size: 0.9rem;
         }
 
-        #video, #canvas {
+        #canvas {
             display: none;
         }
 
         .disclaimer {
-            font-size: 0.85rem;
-            margin: 1.5rem auto 0;
-            padding: 1rem;
-            background-color: #fff3cd;
-            border: 1px solid #ffeeba;
-            border-radius: 5px;
-            width: 95%;
-            max-width: 500px;
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #000;
+            padding: 0.8rem;
+            font-size: 0.8rem;
+            border-radius: 8px;
+            max-width: 90%;
+            text-align: center;
+            z-index: 2;
         }
     </style>
 </head>
 <body>
-    <h1>Registro de Asistencia</h1>
-    <form method="POST" action="{% url 'asistencia' %}" onsubmit="return capturarYEnviar(event);">
-        {% csrf_token %}
-        {% if token %}
-            <input type="hidden" name="token" value="{{ token }}">
-        {% else %}
-            <p style="color: red;">⚠️ Error: falta el token de validación.</p>
-        {% endif %}
-    
-        <label for="dni">DNI:</label>
-        <input type="text" id="dni" name="dni" required>
-    
-        <label for="clave">Clave Secreta:</label>
-        <input type="password" id="clave" name="clave" required>
-    
+    <div class="camera-container">
         <video id="video" autoplay playsinline muted></video>
-        <canvas id="canvas"></canvas>
-        <input type="hidden" name="selfie" id="selfie">
     
-        <button type="submit">Enviar Asistencia</button>
+        <form method="POST" action="{% url 'asistencia' %}" onsubmit="return capturarYEnviar(event);">
+            {% csrf_token %}
+            {% if token %}
+                <input type="hidden" name="token" value="{{ token }}">
+            {% else %}
+                <p style="color: red;">⚠️ Error: falta el token de validación.</p>
+            {% endif %}
     
-        <div id="debug"></div>
-    </form>
+            <input type="hidden" name="lat" id="lat">
+            <input type="hidden" name="lon" id="lon">
     
+            <label for="dni">DNI:</label>
+            <input type="text" id="dni" name="dni" required>
     
+            <label for="clave">Clave Secreta:</label>
+            <input type="password" id="clave" name="clave" required>
+    
+            <canvas id="canvas" style="display: none;"></canvas>
+            <input type="hidden" name="selfie" id="selfie">
+    
+            <button type="button" onclick="capturarYEnviar(event)">Presente</button>
 
-    <div class="disclaimer">
-        Al enviar este formulario, aceptás que se utilice tu rostro como segundo factor de verificación de identidad.<br>
-        La selfie no se almacena, solo se usa en el momento para validar tu presencia.<br>
-        Tus datos están cifrados y protegidos.<br>
-        Si es tu primer ingreso, serás redirigido automáticamente al registro.
+            <div id="debug"></div>
+            
+        </form>
+    
+        <div class="disclaimer">
+            Al enviar este formulario, aceptás que se utilice tu rostro como segundo factor de verificación de identidad.<br>
+            La selfie no se almacena, solo se usa en el momento para validar tu presencia.<br>
+            Tus datos están cifrados y protegidos.<br>
+            Si es tu primer ingreso, serás redirigido automáticamente al registro.
+        </div>
     </div>
-
+    
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const selfieInput = document.getElementById('selfie');
-        const debug = document.getElementById('debug');
-
-        let streamOk = false;
-
-        navigator.mediaDevices.getUserMedia({ video: true })
+        document.addEventListener("DOMContentLoaded", () => {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const selfieInput = document.getElementById('selfie');
+            const debug = document.getElementById('debug');
+            const latInput = document.getElementById('lat');
+            const lonInput = document.getElementById('lon');
+    
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user", width: { min: 640 }, height: { min: 480 } }
+            })
             .then(stream => {
                 video.srcObject = stream;
-                streamOk = true;
+                debug.innerText = '🎥 Cámara activa';
             })
             .catch(error => {
-                debug.innerText = '❌ No se pudo acceder a la cámara: ' + error.message;
-                streamOk = false;
+                debug.innerText = '❌ Cámara: ' + error.message;
             });
+    
+            window.capturarYEnviar = function(event) {
+                event.preventDefault();
+                debug.innerText = "⏳ Solicitando ubicación...";
+    
+                console.log("📍 Solicitando acceso a la ubicación...");
 
-        function capturarYEnviar(event) {
-            event.preventDefault();
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        console.log("✅ Ubicación obtenida:", position.coords);
+                        latInput.value = position.coords.latitude;
+                        lonInput.value = position.coords.longitude;
+                        debug.innerText += '\n📍 Ubicación obtenida';
+                        ubicacionOk = true;
+                    },
+                    (error) => {
+                        console.error("❌ Error obteniendo ubicación:", error.message);
+                        debug.innerText += '\n⚠️ Ubicación: ' + error.message;
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
 
-            if (!streamOk) {
-                alert("La cámara no está disponible.");
-                return false;
+            };
+    
+            function capturarYEnviarConUbicacion(event) {
+                if (!video.srcObject) {
+                    alert("No se detectó cámara activa.");
+                    return false;
+                }
+    
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+    
+                if (canvas.width < 240 || canvas.height < 240) {
+                    debug.innerText += '\n❌ Resolución insuficiente';
+                    return false;
+                }
+    
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+    
+                if (dataURL.length > 100) {
+                    selfieInput.value = dataURL;
+                    debug.innerText += '\n✅ Selfie capturada. Enviando...';
+                    event.target.submit();
+                } else {
+                    debug.innerText += '\n❌ Error al capturar la selfie';
+                }
             }
-
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataURL = canvas.toDataURL('image/jpeg', 0.95);
-
-            if (dataURL.length > 100) {
-                selfieInput.value = dataURL;
-                debug.innerText = '✅ Selfie capturada. Enviando...';
-                event.target.submit();
-            } else {
-                debug.innerText = '❌ Error: no se pudo capturar la selfie';
-            }
-
-            return false;
-        }
+        });
     </script>
-</body>
+    
+        
+    
 </html>

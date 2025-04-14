@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>QR de Asistencia</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            text-align: center;
+            font-family: sans-serif;
+            padding-top: 40px;
+        }
+        img {
+            width: 40vw;
+            max-width: 400px;
+            margin-bottom: 20px;
+        }
+        .url {
+            font-size: 1.2em;
+            color: #aaa;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <h1>Escaneá el código QR para registrar tu asistencia</h1>
+    <img id="qr" src="" alt="QR de Asistencia">
+    <div class="url" id="url">Cargando...</div>
+    <p>El código se actualiza automáticamente cada 40 segundos.</p>
+
+    <script>
+        async function cargarQR() {
+            try {
+                const resp = await fetch("/obtener_qr_dinamico/");
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    document.getElementById("qr").style.display = "none";
+                    document.getElementById("url").textContent = data.error || "Error al obtener QR.";
+                    return;
+                }
+                const data = await resp.json();
+                document.getElementById("qr").src = "data:image/png;base64," + data.qr_base64;
+                document.getElementById("url").textContent = data.url_completa;
+            } catch (err) {
+                console.error(err);
+                document.getElementById("url").textContent = "Error de conexión";
+            }
+        }
+
+        cargarQR();
+        setInterval(cargarQR, 40000); // 40 segundos
+    </script>
+</body>
+</html>
