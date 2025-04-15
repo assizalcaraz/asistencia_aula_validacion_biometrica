@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .error-box {
+        max-width: 500px;
+        margin: 10vh auto;
+        padding: 2rem;
+        background: #1e1e1e;
+        border-radius: 12px;
+        text-align: center;
+        color: #fff;
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
+    }
+
+    .error-box h1 {
+        font-size: 1.6rem;
+        margin-bottom: 1rem;
+        color: #ff4444;
+    }
+
+    .error-box p {
+        font-size: 1rem;
+        color: #ddd;
+    }
+
+    .error-box a {
+        display: inline-block;
+        margin-top: 1.5rem;
+        text-decoration: none;
+        color: #0ff;
+        font-weight: bold;
+    }
+
+    .error-box a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="error-box">
+    <h1>{{ titulo|default:"Error" }}</h1>
+    <p>{{ mensaje|default:"Ocurrió un problema inesperado." }}</p>
+    <a href="{% url 'index' %}">⏪ Volver al inicio</a>
+</div>
+{% endblock %}

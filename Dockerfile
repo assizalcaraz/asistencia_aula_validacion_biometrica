@@ -35,3 +35,5 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 # Comando por defecto (se puede sobrescribir)
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+

@@ -56,13 +56,18 @@ RADIO_METROS = 100  # configurable
 
 
 def dentro_de_radio(lat, lon, centro=FADU_COORDS, radio=RADIO_METROS):
+    if os.environ.get("BYPASS_GEO") == "true":
+        print("[DEBUG] BYPASS_GEO activo, omitiendo validación de geolocalización.")
+        return True
     try:
         ubicacion_usuario = (float(lat), float(lon))
         distancia = geodesic(centro, ubicacion_usuario).meters
+        print(f"[DEBUG] Distancia del usuario: {distancia:.2f} m")
         return distancia <= radio
     except Exception as e:
         print(f"[ERROR] Validando geolocalización: {e}")
         return False
+
 
 
 def index(request):
@@ -336,18 +341,22 @@ def logout(request):
 # Variables de control
 HORARIO_HABILITADO = os.environ.get("HORARIO_HABILITADO", "00:20-23:00")
 DIA_HABILITADO = os.environ.get("DIA_HABILITADO", "4")  #0 = Lunes
-
-
+BYPASS_HORARIO = os.environ.get("BYPASS_HORARIO", "false").lower() == "true"
 
 def asistencia_habilitada():
+    if BYPASS_HORARIO:
+        print("[DEBUG] Bypass de horario activado")
+        return True
+
     ahora = datetime.now()
     dia_actual = str(ahora.weekday())
     hora_actual = ahora.time()
     desde_str, hasta_str = HORARIO_HABILITADO.split("-")
     desde = datetime.strptime(desde_str, "%H:%M").time()
     hasta = datetime.strptime(hasta_str, "%H:%M").time()
-    print ("la hora es", ahora)
+    print("la hora es", ahora)
     return dia_actual == DIA_HABILITADO and desde <= hora_actual <= hasta
+
 
 def mostrar_qr_auto(request):
     return render(request, "mostrar_qr_auto.html")
@@ -403,12 +412,16 @@ def registrar_asistencia(request):
 
         # ✅ Validar cercanía física al aula (FADU)
         if not dentro_de_radio(lat, lon):
-            return HttpResponse("Debés estar físicamente presente en la zona habilitada (FADU)", status=403)
+            return render(request, "error.html", {
+                "titulo": "Debés estar en FADU",
+                "mensaje": "Tu ubicación indica que estás fuera del área permitida para registrar asistencia."
+            })
+
 
         try:
             acceso = TokenAcceso.objects.get(token=token)
         except TokenAcceso.DoesNotExist:
-            return HttpResponse("Token inválido", status=403)
+            return mostrar_error(request, "Token inválido", "El enlace o código QR no es válido.")
 
         ahora = timezone.now()
         if (ahora - acceso.creado).total_seconds() > acceso.vencimiento:

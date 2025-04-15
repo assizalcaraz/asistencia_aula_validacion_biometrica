@@ -133,7 +133,7 @@
             <canvas id="canvas" style="display: none;"></canvas>
             <input type="hidden" name="selfie" id="selfie">
     
-            <button type="button" onclick="capturarYEnviar(event)">Presente</button>
+            <button type="submit" onclick="capturarYEnviar(event)">Presente</button>
 
             <div id="debug"></div>
             
@@ -167,28 +167,68 @@
                 debug.innerText = '❌ Cámara: ' + error.message;
             });
     
-            window.capturarYEnviar = function(event) {
+            window.capturarYEnviar = async function(event) {
                 event.preventDefault();
-                debug.innerText = "⏳ Solicitando ubicación...";
-    
-                console.log("📍 Solicitando acceso a la ubicación...");
+                const form = event.target.closest("form");
+                const button = form.querySelector("button");
+                button.disabled = true;
 
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        console.log("✅ Ubicación obtenida:", position.coords);
-                        latInput.value = position.coords.latitude;
-                        lonInput.value = position.coords.longitude;
-                        debug.innerText += '\n📍 Ubicación obtenida';
-                        ubicacionOk = true;
-                    },
-                    (error) => {
-                        console.error("❌ Error obteniendo ubicación:", error.message);
-                        debug.innerText += '\n⚠️ Ubicación: ' + error.message;
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
+                const esperarUbicacion = new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            document.getElementById("lat").value = position.coords.latitude;
+                            document.getElementById("lon").value = position.coords.longitude;
+                            resolve();
+                        },
+                        (error) => {
+                            alert("No se pudo obtener la ubicación. Asegurate de habilitar los permisos.");
+                            reject(error);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                });
 
+                try {
+                    await esperarUbicacion;
+                } catch (e) {
+                    button.disabled = false;
+                    return false;
+                }
+
+                const canvas = document.getElementById("canvas");
+                const video = document.getElementById("video");
+                const selfieInput = document.getElementById("selfie");
+
+                if (!video.srcObject) {
+                    alert("No se detectó cámara activa.");
+                    button.disabled = false;
+                    return false;
+                }
+
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                if (canvas.width < 240 || canvas.height < 240) {
+                    alert("Resolución insuficiente para reconocimiento facial.");
+                    button.disabled = false;
+                    return false;
+                }
+
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+
+                if (dataURL.length > 100) {
+                    selfieInput.value = dataURL;
+                    form.submit();  // ✅ Esta línea es clave
+                } else {
+                    alert("No se pudo capturar la selfie.");
+                    button.disabled = false;
+                }
+
+                return false;
             };
+
     
             function capturarYEnviarConUbicacion(event) {
                 if (!video.srcObject) {
